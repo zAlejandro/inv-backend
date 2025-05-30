@@ -2,7 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
 const supabase = require('./db');
+
+const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const verificarToken = require('./privado');
 require('dotenv').config();
 
 
@@ -121,11 +124,35 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({mensaje:'Contraseña incorrecta'});
         }
 
-        res.json({mensaje: 'Login exitoso', usuario:{id: usuario.id, nombre: usuario.nombre, correo: usuario.correo}});
+        const token = jwt.sign(
+        {
+            id: usuario.id,
+            nombre: usuario.nombre,
+            correo: usuario.correo
+        },
+        process.env.JWT_SECRET,
+        {
+            expiresIn: process.env.JWT_EXPIRES_IN || '1d'
+        }
+        );
+
+        res.json({
+            mensaje: 'Login exitoso',
+            token,
+            usuario:{
+                id: usuario.id,
+                nombre: usuario.nombre,
+                correo: usuario.correo
+            }
+        });
     } catch (e) {
         res.status(500).json({error: 'error interno del servidor'});
     }
 });
+
+app.get('/api/privado', verificarToken, (req, res) => {
+    res.json({mensaje: 'Acceso permitido', usuario: req.usuario});
+})
 
 
 const PORT = process.env.PORT || 3000;
