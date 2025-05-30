@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
+const http = require('http');
 const supabase = require('./db');
 
 const jwt = require('jsonwebtoken');
@@ -156,6 +157,12 @@ app.get('/api/privado', verificarToken, (req, res) => {
 
 
 const PORT = process.env.PORT || 3000;
+
+const server = http.createServer(app);
+
+server.keepAliveTimeout = 120 * 1000;
+server.headersTimeout = 130 * 1000;
+
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
