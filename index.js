@@ -104,6 +104,29 @@ app.delete('/api/usuarios/:id', async (req, res) => {
     }
 });
 
+app.post('/api/login', async (req, res) => {
+    const {correo, password} = req.body
+
+    try {
+        const result = await pool.query('SELECT * FROM usuarios WHERE correo = $1', [correo]);
+
+        if(result.rows.length === 0){
+            return res.status(401).json({mensaje: 'Correo no registrado'});
+        }
+
+        const usuario = result.rows[0];
+
+        const passwordValida = await bcrypt.compare(password, usuario.password);
+        if(!passwordValida){
+            return res.status(401).json({mensaje:'Contraseña incorrecta'});
+        }
+
+        res.json({mensaje: 'Login exitoso', usuario:{id: usuario.id, nombre: usuario.nombre, correo: usuario.correo}});
+    } catch (e) {
+        res.status(500).json({error: 'error interno del servidor'});
+    }
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
