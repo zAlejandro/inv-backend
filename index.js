@@ -5,7 +5,6 @@ const supabase = require('./db');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
 
-console.log(process.env.DB_URL)
 
 const app = express();
 app.use(cors());
@@ -20,7 +19,7 @@ app.get('/api/usuarios', async (req, res) => {
 
         res.json(result.rows);
     }catch(e){
-        console.error(e);
+        res.status(500).json({error:"Error al obtener los usuarios"});
     }
 });
 
