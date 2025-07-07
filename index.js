@@ -60,7 +60,6 @@ app.post("/api/login", async (req,res) => {
         if(!isMatch){
             return res.status(401).json({error: "Invalid email or password"});
         }
-        console.log(user.name);
 
         const token = jwt.sign(
             {
