@@ -71,13 +71,81 @@ app.post("/api/login", async (req,res) => {
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN }
         );
+        const refreshToken = jwt.sign(
+            {
+                user_id: user.id,
+                tenant_id: user.tenant_id,
+                role: user.role,
+                name: user.name,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "30d"}
+        )
 
-        res.json({ token });
+        res.json({ token, refreshToken });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Server error" });
     }
 });
+
+app.post("/api/refresh", (req, res) => {
+    const {refreshToken} = req.body;
+
+    if(!refreshToken){
+        return res.status(400).json({message: "Refresh Token Missing"});
+    }
+
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+        const payload = {
+            user_id: decoded.user_id,
+            tenant_id: decoded.tenant_id,
+            role: decoded.role,
+            name: decoded.name
+        };
+
+        const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+            expireIn: "15m",
+        });
+
+        res.json({
+            token: newAccessToken,
+        });
+    } catch (e) {
+        console.error(e);
+        return res.status(401).json({message: "Refresh Token Expired or Invalid"});
+    }
+});
+
+app.get("/api/me", authMiddleware, (req, res) => {
+    res.json({
+        user_id: req.user.user_id,
+        name: req.user.name,
+        email: req.user.email,
+        tenant_id: req.user.tenant_id,
+        role: req.user.role
+    });
+});
+
+function authMiddleware(req, res, next){
+    const authHeader = req.headers.authorization;
+
+    if(!authHeader){
+        return res.status(401).json({message: "No Token Provided"});
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (e) {
+        return res.status(401).json({message: "Token Expired or Invalid"});
+    }
+}
 
 app.get("/api/products", authenticateToken, async (req, res) => {
     try {
