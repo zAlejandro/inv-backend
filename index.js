@@ -41,7 +41,7 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req,res) => {
-    const {email, password} = req.body;
+    const {email, password, stayLoggedIn} = req.body;
 
     try {
         const result = await pool.query(
@@ -79,10 +79,15 @@ app.post("/api/login", async (req,res) => {
                 name: user.name,
             },
             process.env.JWT_SECRET,
-            { expiresIn: "30d"}
-        )
+            { expiresIn: "30d" }
+        );
+        console.log(`stay logged: ${stayLoggedIn}`);
+        if (stayLoggedIn == true){
+            res.json({ token, refreshToken });
+        }else{
+            res.json({ token });
+        }
 
-        res.json({ token, refreshToken });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Server error" });
@@ -91,6 +96,8 @@ app.post("/api/login", async (req,res) => {
 
 app.post("/api/refresh", (req, res) => {
     const {refreshToken} = req.body;
+
+    console.log(`refresh token: ${refreshToken}`);
 
     if(!refreshToken){
         return res.status(400).json({message: "Refresh Token Missing"});
@@ -107,11 +114,12 @@ app.post("/api/refresh", (req, res) => {
         };
 
         const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-            expireIn: "15m",
+            expiresIn: "15m",
         });
 
         res.json({
             token: newAccessToken,
+            refreshToken: refreshToken
         });
     } catch (e) {
         console.error(e);
