@@ -117,10 +117,8 @@ app.post("/api/refresh", (req, res) => {
             expiresIn: "15m",
         });
 
-        res.json({
-            token: newAccessToken,
-            refreshToken: refreshToken
-        });
+        res.json({newAccessToken});
+        console.log(`respuesta: ${newAccessToken}`);
     } catch (e) {
         console.error(e);
         return res.status(401).json({message: "Refresh Token Expired or Invalid"});
