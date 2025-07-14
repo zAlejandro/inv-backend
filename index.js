@@ -41,7 +41,7 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req,res) => {
-    const {email, password} = req.body;
+    const {email, password, stayLoggedIn} = req.body;
 
     try {
         const result = await pool.query(
@@ -66,28 +66,124 @@ app.post("/api/login", async (req,res) => {
                 user_id: user.id,
                 tenant_id: user.tenant_id,
                 role: user.role,
+                name: user.name,
             },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN }
         );
+        const refreshToken = jwt.sign(
+            {
+                user_id: user.id,
+                tenant_id: user.tenant_id,
+                role: user.role,
+                name: user.name,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "30d" }
+        );
+        console.log(`stay logged: ${stayLoggedIn}`);
+        if (stayLoggedIn == true){
+            res.json({ token, refreshToken });
+        }else{
+            res.json({ token });
+        }
 
-        res.json({ token });
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: "Server error" });
     }
 });
 
-app.get("/api/products", authenticateToken, async (req, res) => {
+app.post("/api/refresh", (req, res) => {
+    const {refreshToken} = req.body;
+
+    console.log(`refresh token: ${refreshToken}`);
+
+    if(!refreshToken){
+        return res.status(400).json({message: "Refresh Token Missing"});
+    }
+
     try {
-        const result = await pool.query(
-            "SELECT * FROM products WHERE tenant_id = $1",
-            [req.user.tenant_id]
-        );
-        res.json(result.rows);
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+        const payload = {
+            user_id: decoded.user_id,
+            tenant_id: decoded.tenant_id,
+            role: decoded.role,
+            name: decoded.name
+        };
+
+        const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: "15m",
+        });
+
+        res.json({newAccessToken});
+        console.log(`respuesta: ${newAccessToken}`);
     } catch (e) {
         console.error(e);
-        res.status(500).json({ error: "Server error" });
+        return res.status(401).json({message: "Refresh Token Expired or Invalid"});
+    }
+});
+
+app.get("/api/me", authMiddleware, (req, res) => {
+    res.json({
+        user_id: req.user.user_id,
+        name: req.user.name,
+        email: req.user.email,
+        tenant_id: req.user.tenant_id,
+        role: req.user.role
+    });
+});
+
+function authMiddleware(req, res, next){
+    const authHeader = req.headers.authorization;
+
+    if(!authHeader){
+        return res.status(401).json({message: "No Token Provided"});
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (e) {
+        return res.status(401).json({message: "Token Expired or Invalid"});
+    }
+}
+
+app.post("/api/products", authMiddleware, async (req, res) => {
+    try {
+        const {name, description, price, barcode, category_id, stock} = req.body;
+        const tenant_id = req.user.tenant_id;
+
+        if(!nombre || !precio){
+            return res.status(400).json({message: "Nombre y precio son requeridos"});
+        }
+
+        const result = await pool.query(
+            `INSERT INTO productos (tenant_id, name, desription, price, barcode, category_id, stock)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *`,
+            [
+                tenant_id,
+                name,
+                description || null,
+                price,
+                barcode || null,
+                category_id || null,
+                stock || 0
+            ]
+        );
+
+        res.status(201).json({
+            message: "Producto creado correctamente.",
+            producto: result.rows[0]
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({message: "Error interno del servidor."});
     }
 });
 
