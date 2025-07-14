@@ -103,6 +103,60 @@ app.post("/api/refresh", (req, res) => {
         return res.status(400).json({message: "Refresh Token Missing"});
     }
 
+<<<<<<< HEAD
+=======
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+
+        const payload = {
+            user_id: decoded.user_id,
+            tenant_id: decoded.tenant_id,
+            role: decoded.role,
+            name: decoded.name
+        };
+
+        const newAccessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: "15m",
+        });
+
+        res.json({newAccessToken});
+        console.log(`respuesta: ${newAccessToken}`);
+    } catch (e) {
+        console.error(e);
+        return res.status(401).json({message: "Refresh Token Expired or Invalid"});
+    }
+});
+
+app.get("/api/me", authMiddleware, (req, res) => {
+    res.json({
+        user_id: req.user.user_id,
+        name: req.user.name,
+        email: req.user.email,
+        tenant_id: req.user.tenant_id,
+        role: req.user.role
+    });
+});
+
+function authMiddleware(req, res, next){
+    const authHeader = req.headers.authorization;
+
+    if(!authHeader){
+        return res.status(401).json({message: "No Token Provided"});
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (e) {
+        return res.status(401).json({message: "Token Expired or Invalid"});
+    }
+}
+
+app.get("/api/products", authenticateToken, async (req, res) => {
+>>>>>>> 28017dc71dcbf7e5d57524b5b4578f3b1495eef3
     try {
         const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
 
