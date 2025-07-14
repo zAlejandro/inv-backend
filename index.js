@@ -143,6 +143,7 @@ function authMiddleware(req, res, next){
     }
 
     const token = authHeader.split(" ")[1];
+    console.log(jwt.verify(token, process.env.JWT_SECRET));
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -158,12 +159,14 @@ app.post("/api/products", authMiddleware, async (req, res) => {
         const {name, description, price, barcode, category_id, stock} = req.body;
         const tenant_id = req.user.tenant_id;
 
-        if(!nombre || !precio){
+        console.log(`nombre: ${name}`);
+
+        if(!name || !price){
             return res.status(400).json({message: "Nombre y precio son requeridos"});
         }
 
         const result = await pool.query(
-            `INSERT INTO productos (tenant_id, name, desription, price, barcode, category_id, stock)
+            `INSERT INTO products (tenant_id, name, description, price, barcode, category_id, stock)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *`,
             [
@@ -184,6 +187,20 @@ app.post("/api/products", authMiddleware, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({message: "Error interno del servidor."});
+    }
+});
+
+app.get("/api/categories", authMiddleware, async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT id, name FROM categories WHERE tenant_id = $1",
+            [req.user.tenant_id]
+        );
+
+        res.json(result.rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({error: "Server Error"});
     }
 });
 
