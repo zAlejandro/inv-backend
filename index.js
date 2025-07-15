@@ -81,7 +81,6 @@ app.post("/api/login", async (req,res) => {
             process.env.JWT_SECRET,
             { expiresIn: "30d" }
         );
-        console.log(`stay logged: ${stayLoggedIn}`);
         if (stayLoggedIn == true){
             res.json({ token, refreshToken });
         }else{
@@ -97,7 +96,6 @@ app.post("/api/login", async (req,res) => {
 app.post("/api/refresh", (req, res) => {
     const {refreshToken} = req.body;
 
-    console.log(`refresh token: ${refreshToken}`);
 
     if(!refreshToken){
         return res.status(400).json({message: "Refresh Token Missing"});
@@ -118,7 +116,6 @@ app.post("/api/refresh", (req, res) => {
         });
 
         res.json({newAccessToken});
-        console.log(`respuesta: ${newAccessToken}`);
     } catch (e) {
         console.error(e);
         return res.status(401).json({message: "Refresh Token Expired or Invalid"});
@@ -143,7 +140,6 @@ function authMiddleware(req, res, next){
     }
 
     const token = authHeader.split(" ")[1];
-    console.log(jwt.verify(token, process.env.JWT_SECRET));
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -158,8 +154,6 @@ app.post("/api/products", authMiddleware, async (req, res) => {
     try {
         const {name, description, price, barcode, category_id, stock} = req.body;
         const tenant_id = req.user.tenant_id;
-
-        console.log(`nombre: ${name}`);
 
         if(!name || !price){
             return res.status(400).json({message: "Nombre y precio son requeridos"});
@@ -187,6 +181,25 @@ app.post("/api/products", authMiddleware, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({message: "Error interno del servidor."});
+    }
+});
+
+app.get("/api/products", authMiddleware, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT p.*, c.name AS category_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.tenant_id = $1
+            ORDER BY p.created_at DESC`,
+            [req.user.tenant_id]
+
+        );
+        
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({error: "Error al obtener los productos"});
     }
 });
 
