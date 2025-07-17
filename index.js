@@ -4,6 +4,9 @@ import jwt from 'jsonwebtoken';
 import cors from 'cors';
 import pool from './db.js';
 import dotenv from 'dotenv';
+import productsRoutes from './routes/products.js';
+import authMiddleware from "./middlewares/auth.js";
+import categoriesRoutes from './routes/categories.js'
 
 dotenv.config();
 
@@ -12,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/api/mensaje", async (req, res) =>{
-    res.json({"Menaje":"HOLA"});
+    res.json({"Mensaje":"HOLA"});
 })
 
 app.post("/api/register", async (req, res) => {
@@ -132,76 +135,9 @@ app.get("/api/me", authMiddleware, (req, res) => {
     });
 });
 
-function authMiddleware(req, res, next){
-    const authHeader = req.headers.authorization;
+app.use('/api/products', productsRoutes);
 
-    if(!authHeader){
-        return res.status(401).json({message: "No Token Provided"});
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        next();
-    } catch (e) {
-        return res.status(401).json({message: "Token Expired or Invalid"});
-    }
-}
-
-app.post("/api/products", authMiddleware, async (req, res) => {
-    try {
-        const {name, description, price, barcode, category_id, stock} = req.body;
-        const tenant_id = req.user.tenant_id;
-
-        if(!name || !price){
-            return res.status(400).json({message: "Nombre y precio son requeridos"});
-        }
-
-        const result = await pool.query(
-            `INSERT INTO products (tenant_id, name, description, price, barcode, category_id, stock)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *`,
-            [
-                tenant_id,
-                name,
-                description || null,
-                price,
-                barcode || null,
-                category_id || null,
-                stock || 0
-            ]
-        );
-
-        res.status(201).json({
-            message: "Producto creado correctamente.",
-            producto: result.rows[0]
-        });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({message: "Error interno del servidor."});
-    }
-});
-
-app.get("/api/products", authMiddleware, async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT p.*, c.name AS category_name
-            FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            WHERE p.tenant_id = $1
-            ORDER BY p.created_at DESC`,
-            [req.user.tenant_id]
-
-        );
-        
-        res.json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({error: "Error al obtener los productos"});
-    }
-});
+app.use('/api/categories', categoriesRoutes);
 
 app.get("/api/categories", authMiddleware, async (req, res) => {
     try {
@@ -216,19 +152,6 @@ app.get("/api/categories", authMiddleware, async (req, res) => {
         res.status(500).json({error: "Server Error"});
     }
 });
-
-function authenticateToken(req, res, next){
-    const authHeader = req.headers["authorization"];
-    const token = authHeader && authHeader.split(" ")[1];
-
-    if(!token) return res.sendStatus(401);
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
-        next();
-    });
-}
 
 app.listen(process.env.PORT, () => {
     console.log(`Server running on port ${process.env.PORT}`);
